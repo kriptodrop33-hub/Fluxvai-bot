@@ -89,6 +89,30 @@ async def test_telegram_link_and_fast_create(backend):
         await fx.client.aclose()
 
 
+async def test_telegram_rich_menu(backend):
+    chat = str(uuid.uuid4().int % 10**9)
+    wa, fx = FakeWA(channel="telegram"), FluxVAI(httpx.AsyncClient(), channel="telegram")
+    try:
+        email = f"tg_{uuid.uuid4().hex[:8]}@fluxvai.test"
+        reg = await backend.post("/api/auth/register", json={"email": email, "password": "pw123456", "name": "TG"})
+        token = reg.json()["token"]
+        code = (await backend.post("/api/whatsapp/link-code", headers={"Authorization": f"Bearer {token}"})).json()["code"]
+        await fsm.handle_inbound(wa, fx, _inb(chat, text="/start"))
+        await fsm.handle_inbound(wa, fx, _inb(chat, sel="lang:tr"))
+        await fsm.handle_inbound(wa, fx, _inb(chat, text=code))
+        await fsm.handle_inbound(wa, fx, _inb(chat, sel="onb:skip"))
+        # rich Telegram menu: many buttons incl. direct type shortcuts
+        menus = [m for m in wa.sent if m["kind"] == "buttons"]
+        btns = menus[-1]["buttons"]
+        assert len(btns) >= 10
+        assert any(b[0] == "type:video" for b in btns) and any(b[0] == "nav:history" for b in btns)
+        # tapping a type shortcut from the menu jumps straight into the prompt step
+        await fsm.handle_inbound(wa, fx, _inb(chat, sel="type:image"))
+        assert store.get_session(chat)["state"] == "GEN_PROMPT"
+    finally:
+        await fx.client.aclose()
+
+
 async def test_telegram_image_edit_to_confirm(backend):
     chat = str(uuid.uuid4().int % 10**9)
     wa, fx = FakeWA(), FluxVAI(httpx.AsyncClient(), channel="telegram")

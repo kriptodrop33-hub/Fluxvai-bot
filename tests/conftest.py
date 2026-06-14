@@ -26,8 +26,9 @@ os.environ.setdefault("BOT_DB_PATH", str(_DB))
 class FakeWA:
     """Captures outbound messages instead of calling the Graph API."""
 
-    def __init__(self):
+    def __init__(self, channel="whatsapp"):
         self.sent = []  # list of dicts: {kind, to, body, ...}
+        self.channel = channel
 
     async def send_text(self, to, text):
         self.sent.append({"kind": "text", "to": to, "body": text})

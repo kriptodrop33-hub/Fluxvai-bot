@@ -441,6 +441,18 @@ for _lg, _msg in {
 }.items():
     S[_lg]["service_unavailable"] = _msg
 
+# Richer home/welcome banner (used by greeting()).
+for _lg, _msg in {
+    "tr": "✨ *FluxVAI Stüdyo*\nMerhaba {name}! 👋  💰 *{credits}* kredi\n\n🎬 Video · 🖼️ Görsel · 🎵 Ses · 📦 3D · ✏️ Düzenle\nNe yapmak istersin? 👇",
+    "en": "✨ *FluxVAI Studio*\nHi {name}! 👋  💰 *{credits}* credits\n\n🎬 Video · 🖼️ Image · 🎵 Audio · 📦 3D · ✏️ Edit\nWhat would you like to do? 👇",
+    "de": "✨ *FluxVAI Studio*\nHallo {name}! 👋  💰 *{credits}* Credits\n\n🎬 Video · 🖼️ Bild · 🎵 Audio · 📦 3D · ✏️ Bearbeiten\nWas möchtest du tun? 👇",
+    "ar": "✨ *FluxVAI ستوديو*\nمرحباً {name}! 👋  💰 *{credits}* نقطة\n\n🎬 فيديو · 🖼️ صورة · 🎵 صوت · 📦 3D · ✏️ تعديل\nماذا تريد أن تفعل؟ 👇",
+    "es": "✨ *FluxVAI Studio*\n¡Hola {name}! 👋  💰 *{credits}* créditos\n\n🎬 Vídeo · 🖼️ Imagen · 🎵 Audio · 📦 3D · ✏️ Editar\n¿Qué quieres hacer? 👇",
+    "fr": "✨ *FluxVAI Studio*\nSalut {name} ! 👋  💰 *{credits}* crédits\n\n🎬 Vidéo · 🖼️ Image · 🎵 Audio · 📦 3D · ✏️ Modifier\nQue veux-tu faire ? 👇",
+    "ru": "✨ *FluxVAI Студия*\nПривет, {name}! 👋  💰 *{credits}* кредитов\n\n🎬 Видео · 🖼️ Фото · 🎵 Аудио · 📦 3D · ✏️ Правка\nЧто хочешь сделать? 👇",
+}.items():
+    S[_lg]["home"] = _msg
+
 
 # ── localized labels ──────────────────────────────────────────────────
 _TYPE_LABELS = {
@@ -545,7 +557,7 @@ def type_label(lang: str, gen_type: str) -> str:
 
 
 def greeting(lang, name, credits):
-    return t(lang, "greeting").format(name=name, credits=credits)
+    return t(lang, "home").format(name=name, credits=credits)
 
 
 def balance_msg(lang, credits):
@@ -625,6 +637,25 @@ def main_menu_buttons(lang):
     return [(bid, labels[_L(lang)]) for bid, labels in _MENU_BTN]
 
 
+def main_menu_full(lang):
+    """Rich, flat menu for channels without a button cap (Telegram). Direct
+    type shortcuts + every action; the sender lays it out as a grid."""
+    lang = _L(lang)
+    lookup = {rid: labels for rid, labels in (_MORE + _MENU_BTN)}
+
+    def lbl(rid):
+        return lookup.get(rid, {}).get(lang, rid)
+
+    return [
+        ("type:video", _TYPES["video"][lang][0]), ("type:image", _TYPES["image"][lang][0]),
+        ("type:audio", _TYPES["audio"][lang][0]), ("type:3d", _TYPES["3d"][lang][0]),
+        ("nav:edit", lbl("nav:edit")), ("nav:history", lbl("nav:history")),
+        ("nav:prompts", lbl("nav:prompts")), ("nav:buy", lbl("nav:buy")),
+        ("nav:balance", lbl("nav:balance")), ("act:repeat", lbl("act:repeat")),
+        ("nav:lang", lbl("nav:lang")), ("nav:help", lbl("nav:help")),
+    ]
+
+
 def more_menu(lang):
     return [(rid, labels[_L(lang)], "") for rid, labels in _MORE]
 
@@ -655,6 +686,33 @@ def account_card(lang, credits, total, processing, used):
 
 def help_text(lang):
     return _HELP[_L(lang)]
+
+
+_CMD_ORDER = ["start", "menu", "create", "edit", "prompts", "templates", "buy", "balance", "history", "repeat", "lang", "help"]
+_CMD_DESC = {
+    "en": {"start": "Start / main menu", "menu": "Main menu", "create": "Create video/image/audio/3D",
+           "edit": "Edit a photo", "prompts": "My saved prompts", "templates": "Ready templates",
+           "buy": "Buy credits", "balance": "Account & balance", "history": "Gallery / history",
+           "repeat": "Repeat last generation", "lang": "Change language", "help": "Help & commands"},
+    "tr": {"start": "Başlat / ana menü", "menu": "Ana menü", "create": "Video/görsel/ses/3D üret",
+           "edit": "Fotoğraf düzenle", "prompts": "Kayıtlı promptlarım", "templates": "Hazır şablonlar",
+           "buy": "Kredi satın al", "balance": "Hesabım & bakiye", "history": "Galerim / geçmiş",
+           "repeat": "Son üretimi yinele", "lang": "Dili değiştir", "help": "Yardım & komutlar"},
+}
+_ABOUT = {
+    "tr": "FluxVAI — sohbetten AI ile video, görsel, ses ve 3D üret; fotoğraf düzenle, kredinle yönet.",
+    "en": "FluxVAI — create AI video, images, audio & 3D right from chat. Edit photos, manage with credits.",
+}
+
+
+def bot_commands(lang):
+    """For Telegram setMyCommands. Commands are ASCII (parser handles the slash form)."""
+    d = _CMD_DESC.get(_L(lang), _CMD_DESC["en"])
+    return [{"command": c, "description": d.get(c, c)} for c in _CMD_ORDER]
+
+
+def bot_about(lang):
+    return _ABOUT.get(_L(lang), _ABOUT["en"])
 
 
 # ── command parser (slash commands are universal; words TR/EN) ────────

@@ -15,6 +15,8 @@ class WhatsApp:
     webhook path (a raise there would make Meta retry the whole delivery).
     """
 
+    channel = "whatsapp"
+
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
         self.s = get_settings()

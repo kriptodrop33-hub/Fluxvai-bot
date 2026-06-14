@@ -20,6 +20,8 @@ class Telegram:
     """Outbound + media for Telegram. Inline keyboards replace WhatsApp buttons/lists
     (Telegram has no 3-button / 10-row caps, so everything maps cleanly)."""
 
+    channel = "telegram"
+
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
         self.s = get_settings()
@@ -35,9 +37,24 @@ class Telegram:
             return None
 
     @staticmethod
-    def _keyboard(rows) -> dict:
-        # rows: list of (id, title[, desc]) → one inline button per row
-        return {"inline_keyboard": [[{"text": _plain(r[1])[:64], "callback_data": r[0][:64]}] for r in rows]}
+    def _keyboard(rows, cols: int = 2) -> dict:
+        """Inline keyboard as a grid: ≤3 items → one row; otherwise `cols` per row."""
+        btns = [{"text": _plain(r[1])[:64], "callback_data": r[0][:64]} for r in rows]
+        grid = [btns] if len(btns) <= 3 else [btns[i:i + cols] for i in range(0, len(btns), cols)]
+        return {"inline_keyboard": grid}
+
+    async def setup(self) -> None:
+        """One-time profile polish: command menu, menu button, descriptions."""
+        try:
+            from . import i18n
+            await self._call("setMyCommands", {"commands": i18n.bot_commands("en")})
+            await self._call("setMyCommands", {"commands": i18n.bot_commands("tr"), "language_code": "tr"})
+            await self._call("setChatMenuButton", {"menu_button": {"type": "commands"}})
+            await self._call("setMyShortDescription", {"short_description": i18n.bot_about("en")[:120]})
+            await self._call("setMyShortDescription", {"short_description": i18n.bot_about("tr")[:120], "language_code": "tr"})
+            await self._call("setMyDescription", {"description": i18n.bot_about("en")})
+        except Exception as e:  # noqa: BLE001
+            log.warning("telegram setup failed: %s", e)
 
     async def send_text(self, to, text) -> httpx.Response | None:
         return await self._call("sendMessage", {"chat_id": to, "text": _plain(text)[:4096], "disable_web_page_preview": False})

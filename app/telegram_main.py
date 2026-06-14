@@ -63,6 +63,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:  # noqa: BLE001
         log.warning("getMe failed: %s", e)
 
+    await app.state.wa.setup()  # command menu, menu button, descriptions
     await tasks.resume_pending(app.state.wa, app.state.fx)
     poller = asyncio.create_task(_poll_loop(app))
     try:

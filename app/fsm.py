@@ -65,8 +65,28 @@ async def _ask_language(wa: WhatsApp, phone: str, ctx: dict) -> None:
 async def _send_menu(wa: WhatsApp, phone: str, ctx: dict) -> None:
     lang = _lang(ctx)
     user = ctx.get("user") or {}
-    credits = int(user.get("credits", 0))
-    await wa.send_buttons(phone, i18n.greeting(lang, user.get("name", ""), credits), i18n.main_menu_buttons(lang))
+    body = i18n.greeting(lang, user.get("name", ""), int(user.get("credits", 0)))
+    # Telegram has no button cap → rich flat menu with direct shortcuts; WhatsApp → 3 buttons.
+    menu = i18n.main_menu_full(lang) if getattr(wa, "channel", "whatsapp") == "telegram" else i18n.main_menu_buttons(lang)
+    await wa.send_buttons(phone, body, menu)
+
+
+async def _choose_type(wa: WhatsApp, fx: FluxVAI, phone: str, ctx: dict, t: str) -> None:
+    """Entry into the generation wizard for a chosen type (works from the menu too)."""
+    lang = _lang(ctx)
+    if t == "more":
+        store.set_session(phone, "GEN_TYPE", ctx)
+        await wa.send_list(phone, "Tüm türler:" if lang == "tr" else "All types:",
+                           "Tür" if lang == "tr" else "Type", i18n.types(lang, _use_case(ctx)))
+    elif t == "imgedit":
+        await _start_image_edit(wa, phone, ctx)
+    elif t in ("video", "image", "audio", "3d"):
+        ctx["gen"] = {"type": t}
+        _apply_defaults(ctx["gen"])
+        store.set_session(phone, "GEN_PROMPT", ctx)
+        await wa.send_text(phone, i18n.t(lang, "ask_prompt"))
+    else:
+        await wa.send_text(phone, i18n.t(lang, "pick_from_list"))
 
 
 async def _send_more_menu(wa: WhatsApp, phone: str, ctx: dict) -> None:
@@ -328,6 +348,9 @@ async def _dispatch(wa: WhatsApp, fx: FluxVAI, inbound: dict, phone: str) -> Non
         return
     if cmd == "edit" or sel == "nav:edit":
         await _start_image_edit(wa, phone, ctx)
+        return
+    if sel and sel.startswith("type:"):  # direct type shortcuts from the rich menu / quick buttons
+        await _choose_type(wa, fx, phone, ctx, sel.split(":", 1)[1])
         return
     if cmd == "prompts" or sel == "nav:prompts":
         await _show_prompts(wa, fx, phone, ctx)
